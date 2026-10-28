@@ -1,0 +1,6 @@
+{
+  // Put Laragon's bundled Node.js on PATH for terminals opened in this project.
+  "terminal.integrated.env.windows": {
+    "PATH": "C:\\laragon\\bin\\nodejs\\node-v18;${env:PATH}"
+  }
+}

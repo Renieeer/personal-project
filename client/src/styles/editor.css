@@ -1,0 +1,799 @@
+/* ==================================================================
+   Live editor (admin/editor). The preview is the real site with its
+   own styles; everything the editor adds is prefixed "ed-".
+   ================================================================== */
+
+.ed {
+  --ed-bar-h: 56px;
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+/* Top bar ---------------------------------------------------------- */
+.ed-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.55rem var(--gutter);
+  background: var(--text);
+  color: var(--bg);
+  font-size: 0.85rem;
+}
+
+.ed-bar-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.ed-bar-link {
+  padding: 0.35rem 0.4rem;
+  color: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.ed-bar-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+}
+
+.ed-bar-button,
+.ed-bar-select,
+.ed-bar-icon {
+  height: 2rem;
+  padding: 0 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--bg) 30%, var(--text));
+  border-radius: 3px;
+  background: var(--text);
+  color: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.ed-bar-select {
+  max-width: 13rem;
+  padding-right: 0.3rem;
+}
+
+.ed-bar-select option,
+.ed-bar-select optgroup {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.ed-bar-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  padding: 0;
+}
+
+.ed-bar-button:hover:not(:disabled),
+.ed-bar-icon:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--bg) 16%, var(--text));
+}
+
+.ed-bar button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ed-bar-primary {
+  padding-inline: 1.1rem;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.ed-bar-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 82%, var(--bg));
+}
+
+.ed-bar-status {
+  padding-inline: 0.35rem;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
+.ed-bar-error {
+  height: 2rem;
+  padding: 0 0.7rem;
+  border: 0;
+  border-radius: 3px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ed-bar :focus-visible {
+  outline: 2px solid var(--bg);
+  outline-offset: 2px;
+}
+
+/* Phones: pages and panels on one row that scrolls sideways, saving below. */
+@media (max-width: 719px) {
+  .ed-bar-group:first-child {
+    flex-wrap: nowrap;
+    width: calc(100% + var(--gutter));
+    margin-right: calc(-1 * var(--gutter));
+    padding-right: var(--gutter);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .ed-bar-group:first-child > * {
+    flex: none;
+  }
+
+  .ed-bar-select {
+    max-width: 10rem;
+  }
+
+  .ed-bar-group--save {
+    width: 100%;
+  }
+
+  .ed-bar-status {
+    margin-right: auto;
+  }
+}
+
+.ed-banner {
+  padding: 0.6rem var(--gutter);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 0.85rem;
+}
+
+/* Preview ---------------------------------------------------------- */
+.ed-preview {
+  /* --accent is set inline from the draft; re-derive what depends on it. */
+  --accent-ink: var(--accent);
+  transition: opacity 0.2s var(--ease);
+}
+
+:root[data-theme='dark'] .ed-preview {
+  --accent-ink: color-mix(in srgb, var(--accent) 65%, var(--text));
+}
+
+.ed-preview[inert] {
+  opacity: 0.6;
+}
+
+.ed-preview .reveal {
+  opacity: 1;
+  transform: none;
+  transition: none;
+}
+
+.ed-preview .site-header {
+  position: relative;
+  top: auto;
+}
+
+/* Editor controls inside the preview don't take the site's type styles. */
+.ed-ui {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: normal;
+  text-align: left;
+  text-transform: none;
+  color: var(--text);
+}
+
+.ed-icon {
+  display: block;
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+/* Editable text ---------------------------------------------------- */
+.ed-text {
+  border-radius: 2px;
+  outline: 1px dashed transparent;
+  outline-offset: 3px;
+  cursor: text;
+  transition: outline-color 0.15s, background-color 0.15s;
+}
+
+.ed-text:hover {
+  outline-color: color-mix(in srgb, var(--accent) 65%, transparent);
+}
+
+.ed-text:focus {
+  outline: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.ed-text:empty {
+  display: inline-block;
+  min-width: 1ch;
+}
+
+.ed-text:empty::before {
+  content: attr(data-placeholder);
+}
+
+.ed-text:empty::before,
+.ed-placeholder {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.ed-text--panel,
+.ed-text--button {
+  cursor: pointer;
+}
+
+.ed-text--panel {
+  text-decoration: underline dotted color-mix(in srgb, var(--accent) 70%, transparent);
+  text-underline-offset: 0.25em;
+}
+
+.ed-text[data-error],
+.ed-block[data-error] {
+  outline: 2px solid var(--accent);
+}
+
+.ed-block {
+  border-radius: 2px;
+  outline: 1px dashed transparent;
+  outline-offset: 6px;
+  cursor: text;
+  transition: outline-color 0.15s;
+}
+
+.ed-block:hover {
+  outline-color: color-mix(in srgb, var(--accent) 65%, transparent);
+}
+
+.ed-block:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+.ed-textarea {
+  display: block;
+  width: 100%;
+  min-height: 6rem;
+  padding: 0.5rem;
+  border: 0;
+  border-radius: 2px;
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  background: color-mix(in srgb, var(--accent) 5%, var(--bg));
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  resize: vertical;
+}
+
+.ed-hint {
+  display: block;
+  margin-top: 0.75rem;
+  color: var(--muted);
+}
+
+.ed-error-tip {
+  display: inline-block;
+  margin: 0.25rem 0.5rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 2px;
+  background: var(--accent);
+  color: var(--on-accent);
+  vertical-align: middle;
+}
+
+/* Row toolbars ------------------------------------------------------ */
+/* The element holding a toolbar ("host") is the row it belongs to. */
+.ed-preview :has(> .ed-item) {
+  position: relative;
+}
+
+.ed-preview :has(> .ed-item):hover {
+  outline: 1px dashed color-mix(in srgb, var(--accent) 40%, transparent);
+  outline-offset: 4px;
+}
+
+.ed-preview :has(> .ed-item[data-hidden]) > :not(.ed-item) {
+  opacity: 0.4;
+}
+
+.ed-preview :has(> .ed-item[data-error]) {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.ed-preview [data-ed-dragging] {
+  opacity: 0.5;
+}
+
+.ed-preview [data-ed-drop='before'] {
+  box-shadow: 0 -3px 0 var(--accent);
+}
+
+.ed-preview [data-ed-drop='after'] {
+  box-shadow: 0 3px 0 var(--accent);
+}
+
+.ed-item {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  z-index: 6;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.3rem;
+  max-width: calc(100% - 0.7rem);
+  pointer-events: none;
+}
+
+.ed-item > * {
+  pointer-events: auto;
+}
+
+.ed-item-tools {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  padding: 2px;
+  border-radius: 4px;
+  background: var(--text);
+  color: var(--bg);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+
+.ed-preview :has(> .ed-item):hover > .ed-item .ed-item-tools,
+.ed-item:focus-within .ed-item-tools {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* With nested rows (skills in a category), only the innermost hovered row
+   shows its tools. (:has() cannot be nested, hence ":hover > .ed-item".) */
+.ed-preview :has(> .ed-item):has(:hover > .ed-item) > .ed-item:not(:focus-within) .ed-item-tools {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ed-tool {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ed-tool:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--bg) 18%, var(--text));
+}
+
+.ed-tool:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.ed-tool--danger:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.ed-tool:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.ed-drag {
+  cursor: grab;
+}
+
+.ed-drag:active {
+  cursor: grabbing;
+}
+
+.ed-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ed-badge--new {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.ed-badge--error {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  cursor: pointer;
+}
+
+.ed-item-more {
+  display: none;
+}
+
+/* Touch screens have no hover: each row shows a "•••" button that opens
+   its tools, so the tools don't cover the text. Dragging is mouse-only. */
+@media (hover: none) {
+  .ed-item-more {
+    display: inline-grid;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    background: var(--text);
+    color: var(--bg);
+    box-shadow: 0 4px 14px rgb(0 0 0 / 0.18);
+  }
+
+  .ed-item[data-open] .ed-item-more {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+
+  .ed-item-tools {
+    display: none;
+  }
+
+  .ed-item[data-open] .ed-item-tools,
+  .ed-preview :has(> .ed-item):has(:hover > .ed-item) > .ed-item[data-open] .ed-item-tools {
+    display: inline-flex;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .ed-tool {
+    width: 34px;
+    height: 34px;
+  }
+
+  .ed-drag {
+    display: none;
+  }
+}
+
+/* Images and files -------------------------------------------------- */
+.ed-file {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  vertical-align: middle;
+}
+
+.ed-preview :has(> .ed-file--overlay) {
+  position: relative;
+}
+
+.ed-file--overlay {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.ed-preview :has(> .ed-file--overlay):hover > .ed-file--overlay,
+.ed-file--overlay:focus-within,
+.ed-file--overlay:has(.ed-chip--note, .ed-chip--error) {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .ed-file--overlay {
+    opacity: 1;
+  }
+}
+
+.ed-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 28px;
+  padding: 0.25rem 0.6rem;
+  border: 0;
+  border-radius: 4px;
+  background: var(--text);
+  color: var(--bg);
+  font: inherit;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.18);
+  cursor: pointer;
+}
+
+button.ed-chip:hover {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.ed-chip--note {
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text);
+  cursor: default;
+}
+
+.ed-chip--error {
+  background: var(--accent);
+  color: var(--on-accent);
+  white-space: normal;
+  cursor: default;
+}
+
+/* Add buttons ------------------------------------------------------- */
+.ed-add {
+  margin-top: 1.25rem;
+}
+
+.ed-add-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.85rem;
+  border: 1px dashed color-mix(in srgb, var(--text) 35%, var(--bg));
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ed-add-button:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  color: var(--text);
+}
+
+.ed-add-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Section bars ------------------------------------------------------ */
+.ed-section {
+  position: relative;
+  scroll-margin-top: calc(var(--ed-bar-h) + 0.5rem);
+}
+
+.ed-section-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  width: min(1320px, 100% - 2 * var(--gutter));
+  margin-inline: auto;
+  padding-block: 0.6rem;
+  color: var(--muted);
+}
+
+.ed-section-name {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.ed-section-bar .ed-badge--error {
+  text-transform: none;
+}
+
+.ed-section-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+
+.ed-section-bar .ed-tool {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+
+.ed-section-bar .ed-tool:hover:not(:disabled) {
+  background: var(--surface);
+}
+
+.ed-text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 30px;
+  padding: 0 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ed-text-button:hover {
+  background: var(--surface);
+}
+
+.ed-text-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.ed-section[data-hidden] > :not(.ed-section-bar) {
+  opacity: 0.35;
+}
+
+.ed-empty {
+  padding: 1.5rem;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ed-empty .ed-add {
+  margin-top: 0.75rem;
+}
+
+/* Side panel -------------------------------------------------------- */
+.ed-panel {
+  position: fixed;
+  top: var(--ed-bar-h);
+  right: 0;
+  bottom: 0;
+  z-index: 950;
+  display: flex;
+  flex-direction: column;
+  width: min(440px, 100%);
+  border-left: 1px solid var(--line);
+  background: var(--bg);
+  box-shadow: -12px 0 32px rgb(0 0 0 / 0.12);
+}
+
+.ed-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.ed-panel-head .admin-subtitle {
+  overflow-wrap: anywhere;
+}
+
+.ed-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1.25rem 1.25rem 3rem;
+}
+
+.ed-panel .admin-field-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.ed-panel-note {
+  display: grid;
+  justify-items: start;
+  gap: 0.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+}
+
+.ed-fieldset {
+  display: grid;
+  gap: 1rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  border: 0;
+}
+
+.ed-fieldset legend {
+  margin-bottom: 0.75rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+@media (max-width: 719px) {
+  .ed-panel {
+    top: auto;
+    width: 100%;
+    height: min(85vh, calc(100vh - var(--ed-bar-h)));
+    border-top: 1px solid var(--line);
+    border-left: 0;
+    box-shadow: 0 -12px 32px rgb(0 0 0 / 0.15);
+  }
+}
+
+/* Popover for text inside buttons ------------------------------------ */
+.ed-popover {
+  position: fixed;
+  z-index: 1100;
+  display: grid;
+  gap: 0.4rem;
+  width: 320px;
+  max-width: calc(100vw - 16px);
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.2);
+}
+
+.ed-popover-label {
+  color: var(--muted);
+}
+
+.ed-popover input {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--text) 25%, var(--bg));
+  background: var(--bg);
+  font-size: 15px;
+}
+
+.ed-popover input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Messages ------------------------------------------------------------ */
+.ed-toast {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 50%;
+  z-index: 1200;
+  width: max-content;
+  max-width: calc(100vw - 2rem);
+  padding: 0.7rem 1rem;
+  border-radius: 4px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 0.875rem;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.2);
+  transform: translateX(-50%);
+}
+
+.ed-toast.is-error {
+  background: var(--accent);
+  color: var(--on-accent);
+}

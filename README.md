@@ -4,7 +4,10 @@ A personal portfolio with a public site and an admin panel.
 
 - **client/**: React (Vite) + React Router, plain CSS
 - **server/**: Node.js + Express API
+- **api/**: runs the Express API as a Vercel function
 - **supabase/**: Postgres schema, Row Level Security, Storage buckets and seed data
+
+It deploys to Vercel as one project (site and API together). See [Deploy to Vercel](#deploy-to-vercel).
 
 All content (including section headings) lives in Supabase and starts as sample content for a fictional developer. Replace it from the admin panel at `/admin`.
 
@@ -15,7 +18,8 @@ All content (including section headings) lives in Supabase and starts as sample 
 | Public pages read content | Browser → Supabase directly, with the **anon key**. RLS returns only visible rows. |
 | Contact form | Browser → `POST /api/contact` → Supabase (`messages` table) |
 | Admin sign-in | Browser → Supabase Auth (email + password) |
-| Admin reads and writes, uploads | Browser → `/api/admin/*` with the user's JWT → Express verifies it → Supabase with the **service role key** |
+| Admin reads and writes | Browser → `/api/admin/*` with the user's JWT → Express verifies it → Supabase with the **service role key** |
+| Admin uploads | Browser asks the API for a one-time upload URL → uploads the file straight to the private `uploads` bucket → the API checks it and moves it into place |
 
 The service role key exists only in `server/.env`. The browser never sees it.
 
@@ -31,10 +35,13 @@ client/
   src/lib/api.js       Fetch wrapper for the Express API
   src/styles/          base.css (tokens), site.css, admin.css
 server/
-  index.js             App setup, CORS, error handling
+  app.js               App setup, CORS, error handling
+  index.js             Runs app.js as a server (local, Render, ...)
   routes/              public, admin, generic CRUD, sections, messages, stats, account
   middleware/          auth (JWT + admin email), upload (type/size/magic bytes), rateLimit
   lib/supabase.js      Service-role Supabase client
+api/index.js           Runs server/app.js as a Vercel function
+vercel.json            Vercel build, /api routing and page fallback
 supabase/
   migrations.sql       Tables, RLS policies, storage buckets
   seed.sql             Sample content for every table
@@ -58,12 +65,17 @@ supabase/
 
 In the dashboard, open **SQL Editor → New query**, then:
 
-1. Paste the contents of `supabase/migrations.sql` and click **Run**. This creates all tables, RLS policies and the four storage buckets (`avatars`, `projects`, `certificates`, `documents`). It is safe to run again.
+1. Paste the contents of `supabase/migrations.sql` and click **Run**. This creates all tables, RLS policies and the storage buckets: four public ones (`avatars`, `projects`, `certificates`, `documents`) and the private `uploads` bucket that admin uploads pass through. It is safe to run again.
 2. Open a new query, paste `supabase/seed.sql` and click **Run**. This fills every table with sample content.
 
 > `seed.sql` empties the content tables (including messages) before inserting. Run it only on a fresh project.
 
-**Already set up?** After updating the code, run `supabase/migrations.sql` again (it is safe to re-run). It adds the `ui_text` table that stores your button and label texts. Until then the site shows the default texts and the live editor says they can't be edited yet. Do not re-run `seed.sql`.
+**Already set up?** After updating the code, run `supabase/migrations.sql` again (it is safe to re-run and keeps your content). It adds:
+
+- the `ui_text` table that stores your button and label texts. Until then the site shows the default texts and the live editor says they can't be edited yet.
+- the private `uploads` bucket. Until then, uploading a photo, CV or favicon says the bucket is missing.
+
+Do not re-run `seed.sql`: it replaces your content with the sample content.
 
 ## 3. Create the admin user
 
@@ -150,7 +162,13 @@ The form pages below still work, and each has an **Edit on the live page** butto
 
 ### Uploads
 
-All uploads go through the API and are checked on the server:
+Files don't pass through the API itself, because hosts like Vercel reject requests over 4.5 MB. Instead:
+
+1. The browser asks `POST /api/admin/uploads` (admin only) for a one-time upload URL in the private `uploads` bucket.
+2. It uploads the file there directly.
+3. It sends the API the file's path. The API downloads it, checks it, copies it to the right public bucket and deletes the staged copy. Staged files nobody used are deleted after a day.
+
+Every file is checked on the server:
 
 | Kind | Types | Max size | Bucket |
 | --- | --- | --- | --- |
@@ -158,7 +176,7 @@ All uploads go through the API and are checked on the server:
 | CV | PDF | 10 MB | `documents` |
 | Favicon | PNG, ICO | 1 MB | `documents` |
 
-The server checks both the declared MIME type and the file's actual bytes, and saves each file under a unique name (`<table>/<timestamp>-<uuid>.<ext>`). When a file is replaced or its record is deleted, the old file is removed from storage. Deleting a project also removes its gallery images.
+The server checks the file type, size and the file's actual bytes, and saves each file under a unique name (`<table>/<timestamp>-<uuid>.<ext>`). When a file is replaced or its record is deleted, the old file is removed from storage. Deleting a project also removes its gallery images.
 
 ## Security model
 
@@ -166,37 +184,43 @@ The server checks both the declared MIME type and the file's actual bytes, and s
   - `anon` and `authenticated` can `SELECT` only rows where `is_visible = true`. Skills and gallery images also require a visible parent. `profile`, `settings` and `ui_text` are readable.
   - They can `INSERT` into `messages` only, and cannot read messages.
   - No other policies exist, so every other write is denied unless it uses the service role (the API).
-- Storage buckets are public for reading. There are no write policies, so only the API can upload or delete.
+- The four content buckets are public for reading. There are no write policies, so only the API can upload or delete. The `uploads` bucket is private: the browser can only put a file at a path the API signed for the signed-in admin.
 - Every `/api/admin/*` request verifies the Supabase JWT with `auth.getUser()` and requires the email to match `ADMIN_EMAIL`.
 - The contact form is validated server-side, rate limited to 5 messages per 10 minutes per IP, and has a honeypot field.
 
-## Deployment
+## Deploy to Vercel
 
-The client is static files; the API is a small Node service. Two common setups:
+One Vercel project serves the site and runs the API as a function (`api/index.js`). `vercel.json` sets the build and sends `/api/*` to the function and every other path to the site, so links like `/admin` and `/projects/...` work when opened directly.
 
-### Option A: one service (simplest)
+1. Run `supabase/migrations.sql` first (see [step 2](#2-run-the-sql)). Admin uploads need its `uploads` bucket.
+2. On <https://vercel.com/new>, import the GitHub repository.
+3. **Root Directory**: leave it as the repository root (`./`). Don't pick `client`, or the API won't be deployed. **Framework Preset**: Other. Leave the build, output and install settings alone; `vercel.json` sets them.
+4. **Environment Variables**: add these five. They are the same values as in your two `.env` files.
 
-Deploy the whole repo to a Node host such as Render, Railway or Fly.io:
+   | Name | Value |
+   | --- | --- |
+   | `SUPABASE_URL` | Project URL |
+   | `SUPABASE_SERVICE_ROLE_KEY` | service_role key |
+   | `ADMIN_EMAIL` | Email of your admin user |
+   | `VITE_SUPABASE_URL` | Project URL (same as `SUPABASE_URL`) |
+   | `VITE_SUPABASE_ANON_KEY` | anon public key |
 
-- **Build command:** `npm run install:all && npm run build`
-- **Start command:** `npm start`
-- **Environment:** every variable from both `.env` files. The `VITE_*` variables must be present at build time. Also set `SERVE_CLIENT=true` and `TRUST_PROXY=true`, and leave `VITE_API_URL` empty.
+   Leave out `VITE_API_URL`, `CLIENT_ORIGIN`, `SERVE_CLIENT`, `TRUST_PROXY` and `PORT`. The site and API share one domain, so they aren't needed.
+5. Click **Deploy**.
+6. Open `https://<your-project>.vercel.app/api/health`. It should show `{"ok":true}`. If you see the site or an error instead, check the Root Directory and the environment variables.
+7. In Supabase, set **Authentication → URL Configuration → Site URL** to your Vercel URL.
+8. Optional, for faster saving: in Vercel, open **Settings → Functions → Function Region** and pick the region closest to your Supabase project's region (Supabase: **Project Settings → General**). Each save in the admin makes several calls from the function to Supabase.
 
-The API then serves the site and handles client-side routes (`/projects/...`, `/admin/...`).
+Every push to `main` redeploys. After changing an environment variable, redeploy (**Deployments → ⋯ → Redeploy**). The `VITE_*` values are built into the site.
 
-### Option B: static client + separate API
+On Vercel's free plan, the contact form's rate limit (kept in memory) is per function instance, so it is a soft limit there.
 
-- **Client** on Vercel, Netlify or Cloudflare Pages:
-  - Root directory `client`, build `npm run build`, output `dist`.
-  - Set `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` and `VITE_API_URL=https://your-api.example.com`.
-  - SPA fallbacks are included: `client/vercel.json` for Vercel and `client/public/_redirects` for Netlify.
-- **API** on Render, Railway or Fly.io:
-  - Root directory `server`, start `npm start`.
-  - Set the server variables, plus `CLIENT_ORIGIN=https://your-site.example.com` and `TRUST_PROXY=true`.
+### Other hosts
+
+- **One Node service** (Render, Railway, Fly.io): build `npm run install:all && npm run build`, start `npm start`. Set every variable from both `.env` files, plus `SERVE_CLIENT=true` and `TRUST_PROXY=true`, and leave `VITE_API_URL` empty. The API then serves the site.
+- **Static client + separate API**: build the client from `client/` (output `dist`) with `VITE_API_URL=https://your-api.example.com`. Run the API from `server/` (`npm start`) with `CLIENT_ORIGIN=https://your-site.example.com` and `TRUST_PROXY=true`. The client needs a fallback that serves `index.html` for unknown paths (`client/public/_redirects` covers Netlify).
 
 ### After deploying
 
-- In Supabase, set **Authentication → URL Configuration → Site URL** to your public site URL.
 - Sign in at `/admin`, then replace the sample content, upload your photos and CV, and set your accent color and favicon.
 - The seed images come from `picsum.photos` and the seed CV is a public sample PDF. Replace them by uploading your own files.
-- The contact rate limiter keeps counts in memory. That is fine for a single instance; use a shared store if you run several.

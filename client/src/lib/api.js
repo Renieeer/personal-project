@@ -19,8 +19,8 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  let payload = body;
-  if (body !== undefined && !(body instanceof FormData)) {
+  let payload;
+  if (body !== undefined) {
     headers['Content-Type'] = 'application/json';
     payload = JSON.stringify(body);
   }
@@ -37,16 +37,38 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
     if (res.status === 401 && auth) await supabase.auth.signOut();
     throw new ApiError(data?.error || `Request failed (${res.status}).`, res.status, data?.details);
   }
+  // Every API response is JSON. Anything else (usually index.html) means
+  // /api is not reaching the server.
+  if (!res.headers.get('content-type')?.includes('application/json')) {
+    throw new ApiError('The server is not reachable. Is the API deployed?', res.status);
+  }
   return data;
 }
 
-function toFormData(fields) {
-  const form = new FormData();
+// Files go from the browser straight to a private staging bucket with a
+// signed URL, so they never pass through the API (hosts like Vercel cap
+// request bodies at 4.5 MB). The API then checks them and moves them.
+async function stageFile(file) {
+  const { bucket, path, token } = await request('/admin/uploads', {
+    method: 'POST',
+    body: { type: file.type, size: file.size },
+  });
+  const { error } = await supabase.storage.from(bucket).uploadToSignedUrl(path, token, file, { contentType: file.type });
+  if (error) throw new ApiError(`Could not upload "${file.name}": ${error.message}`, 0);
+  return { path, name: file.name };
+}
+
+// Like post(), but File values (alone or in a list) are staged first and
+// sent as { path, name }.
+async function upload(path, fields) {
+  const body = {};
   for (const [key, value] of Object.entries(fields)) {
-    if (Array.isArray(value)) value.forEach((item) => form.append(key, item));
-    else if (value !== undefined && value !== null) form.append(key, value);
+    if (value instanceof Blob) body[key] = await stageFile(value);
+    else if (Array.isArray(value) && value.some((item) => item instanceof Blob)) {
+      body[key] = await Promise.all(value.map(stageFile));
+    } else body[key] = value;
   }
-  return form;
+  return request(path, { method: 'POST', body });
 }
 
 export const api = {
@@ -55,6 +77,6 @@ export const api = {
   put: (path, body) => request(path, { method: 'PUT', body }),
   patch: (path, body) => request(path, { method: 'PATCH', body }),
   del: (path) => request(path, { method: 'DELETE' }),
-  upload: (path, fields) => request(path, { method: 'POST', body: toFormData(fields) }),
+  upload,
   publicPost: (path, body) => request(path, { method: 'POST', body, auth: false }),
 };

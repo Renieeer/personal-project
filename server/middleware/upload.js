@@ -1,5 +1,5 @@
-import multer from 'multer';
 import { HttpError } from '../lib/http.js';
+import { createStagedUpload, readStagedFile, removeStaged } from '../lib/storage.js';
 
 const MB = 1024 * 1024;
 
@@ -22,6 +22,13 @@ const RULES = {
   },
 };
 
+// Every type any kind accepts. Staging only checks these; the route's kind
+// is checked when the file is used.
+const STAGE_TYPES = Object.assign({}, ...Object.values(RULES).map((rule) => rule.types));
+const STAGE_MAX_SIZE = Math.max(...Object.values(RULES).map((rule) => rule.maxSize));
+const EXT_TYPES = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', pdf: 'application/pdf', ico: 'image/x-icon' };
+const STAGED_PATH = /^\d+-[0-9a-f-]{36}\.(jpg|png|webp|gif|pdf|ico)$/;
+
 const startsWith = (buf, bytes, offset = 0) => buf.length >= offset + bytes.length && bytes.every((b, i) => buf[offset + i] === b);
 const ascii = (text) => [...text].map((c) => c.charCodeAt(0));
 
@@ -35,57 +42,61 @@ const SIGNATURES = {
   ico: (buf) => startsWith(buf, [0x00, 0x00, 0x01, 0x00]),
 };
 
-const uploaders = new Map();
-
-function getUploader(kind, field, maxCount) {
-  const key = `${kind}:${field}:${maxCount}`;
-  if (!uploaders.has(key)) {
-    const rule = RULES[kind];
-    const instance = multer({
-      storage: multer.memoryStorage(),
-      limits: { fileSize: rule.maxSize, files: maxCount, fields: 10 },
-      fileFilter: (req, file, cb) => {
-        if (rule.types[file.mimetype]) cb(null, true);
-        else cb(new HttpError(400, `Unsupported file type. Allowed: ${rule.label}.`));
-      },
-    });
-    uploaders.set(key, instance.array(field, maxCount));
-  }
-  return uploaders.get(key);
+// Step 1: { type, size } -> { bucket, path, token }. The browser uploads
+// the file there itself (supabase.storage...uploadToSignedUrl).
+export async function stageUpload({ type, size } = {}) {
+  const ext = STAGE_TYPES[type];
+  if (!ext) throw new HttpError(400, 'Unsupported file type. Allowed: JPG, PNG, WebP, GIF, PDF or ICO.');
+  if (!Number.isFinite(size) || size <= 0) throw new HttpError(400, 'The file is empty.');
+  if (size > STAGE_MAX_SIZE) throw new HttpError(400, `File is too large. Maximum size is ${STAGE_MAX_SIZE / MB} MB.`);
+  return createStagedUpload(ext);
 }
 
-// Parses a multipart upload into req.files and validates type, size and content.
+async function loadStaged(rule, { path, name }) {
+  const originalname = typeof name === 'string' ? name.slice(0, 200) : 'file';
+  const ext = STAGED_PATH.exec(path)[1];
+  if (!Object.values(rule.types).includes(ext)) {
+    throw new HttpError(400, `"${originalname}" is not supported here. Allowed: ${rule.label}.`);
+  }
+  const buffer = await readStagedFile(path);
+  if (!buffer) throw new HttpError(400, `"${originalname}" was not uploaded. Please try again.`);
+  if (buffer.length > rule.maxSize) {
+    throw new HttpError(400, `"${originalname}" is too large. Maximum size is ${rule.maxSize / MB} MB.`);
+  }
+  if (!SIGNATURES[ext](buffer)) throw new HttpError(400, `"${originalname}" is not a valid ${rule.label} file.`);
+  return { buffer, mimetype: EXT_TYPES[ext], ext, size: buffer.length, originalname };
+}
+
+// Step 2: reads the staged files named in req.body[field] ({ path, name } or
+// a list of them), validates type, size and content for this kind, and sets
+// req.files to [{ buffer, mimetype, ext, size, originalname }]. The staged
+// copies are removed before the route runs.
 export function handleUpload(kind, { field = 'file', maxCount = 1 } = {}) {
   const rule = RULES[kind];
   if (!rule) throw new Error(`Unknown upload kind: ${kind}`);
-  const upload = getUploader(kind, field, maxCount);
 
-  return (req, res, next) => {
-    upload(req, res, (err) => {
-      if (err) {
-        if (err instanceof multer.MulterError) {
-          if (err.code === 'LIMIT_FILE_SIZE') {
-            return next(new HttpError(400, `File is too large. Maximum size is ${rule.maxSize / MB} MB.`));
-          }
-          if (err.code === 'LIMIT_FILE_COUNT' || err.code === 'LIMIT_UNEXPECTED_FILE') {
-            return next(new HttpError(400, maxCount > 1 ? `Upload up to ${maxCount} files at a time.` : 'Upload one file at a time.'));
-          }
-          return next(new HttpError(400, err.message));
-        }
-        return next(err);
+  return async (req, res, next) => {
+    const items = [].concat(req.body?.[field] ?? []);
+    const valid = items.every((item) => typeof item?.path === 'string' && STAGED_PATH.test(item.path));
+    const paths = valid ? items.map((item) => item.path) : [];
+
+    let files;
+    let error;
+    if (!items.length) error = new HttpError(400, 'No file was uploaded.');
+    else if (!valid) error = new HttpError(400, 'Invalid upload.');
+    else if (items.length > maxCount) {
+      error = new HttpError(400, maxCount > 1 ? `Upload up to ${maxCount} files at a time.` : 'Upload one file at a time.');
+    } else {
+      try {
+        files = await Promise.all(items.map((item) => loadStaged(rule, item)));
+      } catch (err) {
+        error = err;
       }
+    }
 
-      const files = req.files || [];
-      if (!files.length) return next(new HttpError(400, 'No file was uploaded.'));
-
-      for (const file of files) {
-        const ext = rule.types[file.mimetype];
-        if (!SIGNATURES[ext](file.buffer)) {
-          return next(new HttpError(400, `"${file.originalname}" is not a valid ${rule.label} file.`));
-        }
-        file.ext = ext;
-      }
-      next();
-    });
+    await removeStaged(paths);
+    if (error) return next(error);
+    req.files = files;
+    next();
   };
 }

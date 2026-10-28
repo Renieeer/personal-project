@@ -349,8 +349,21 @@ on conflict (id) do update set
   file_size_limit    = excluded.file_size_limit,
   allowed_mime_types = excluded.allowed_mime_types;
 
--- Anyone may read files in these buckets. There are no insert, update or
--- delete policies, so only the service role (the Express API) can write.
+-- Staging for admin uploads: private, no policies. The browser uploads with
+-- a one-time signed URL from the API, then the API checks the file and
+-- moves it to one of the buckets above (so files never pass through the
+-- API host, which may limit request size).
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values
+  ('uploads', 'uploads', false, 10485760,
+     array['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf',
+           'image/x-icon', 'image/vnd.microsoft.icon'])
+on conflict (id) do update set
+  public             = excluded.public,
+  file_size_limit    = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+-- Anyone may read files in the public buckets. There are no insert, update
+-- or delete policies, so only the service role (the Express API) can write.
 drop policy if exists "Public can read portfolio files" on storage.objects;
 create policy "Public can read portfolio files" on storage.objects
   for select to anon, authenticated

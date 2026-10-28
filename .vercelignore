@@ -1,0 +1,6 @@
+# Files `vercel deploy` must not upload. Secrets come from the project's
+# Environment Variables, and Vercel installs and builds everything itself.
+**/.env
+**/.env.*
+**/node_modules
+client/dist

@@ -6,9 +6,17 @@ import messagesRouter from './messages.js';
 import statsRouter from './stats.js';
 import accountRouter from './account.js';
 import uiTextRouter from './uiText.js';
+import { asyncHandler } from '../lib/http.js';
+import { stageUpload } from '../middleware/upload.js';
 
-// Every route here is mounted behind requireAdmin (see index.js).
+// Every route here is mounted behind requireAdmin (see app.js).
 const router = express.Router();
+
+// POST /uploads { type, size } -> a signed URL to upload one file into the
+// staging bucket. The file routes then take { path, name } instead of the file.
+router.post('/uploads', asyncHandler(async (req, res) => {
+  res.status(201).json(await stageUpload(req.body));
+}));
 
 router.use('/stats', statsRouter);
 router.use('/messages', messagesRouter);

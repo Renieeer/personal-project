@@ -40,7 +40,7 @@ async function projectGalleryFiles(project) {
   return [{ bucket: 'projects', paths: images.map((image) => image.image_path) }];
 }
 
-// POST /project_images/upload  (multipart: project_id, files[])
+// POST /project_images/upload  { project_id, files: [{ path, name }] } (staged uploads)
 function mountGalleryUpload(router) {
   router.post('/upload', handleUpload('image', { field: 'files', maxCount: 10 }), asyncHandler(async (req, res) => {
     const projectId = parseId(req.body.project_id);

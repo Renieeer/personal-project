@@ -4,6 +4,7 @@ import { SiteDataProvider } from './lib/siteData.jsx';
 import PublicLayout from './components/PublicLayout.jsx';
 import Home from './pages/Home.jsx';
 import ProjectDetail from './pages/ProjectDetail.jsx';
+import Resume from './pages/Resume.jsx';
 import NotFound from './pages/NotFound.jsx';
 
 // The admin panel is a separate chunk, so visitors never download it.
@@ -23,6 +24,7 @@ export default function App() {
       <Route element={<SiteDataProvider><PublicLayout /></SiteDataProvider>}>
         <Route index element={<Home />} />
         <Route path="projects/:slug" element={<ProjectDetail />} />
+        <Route path="resume" element={<Resume />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

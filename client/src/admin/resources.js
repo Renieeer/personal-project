@@ -156,7 +156,7 @@ export const profileConfig = {
   endpoint: 'profile',
   panel: 'profile',
   title: 'Profile',
-  description: 'Used in the header, hero, about and contact sections.',
+  description: 'Used in the header, hero, about and contact sections, and on the resume page.',
   fields: [
     { name: 'full_name', label: 'Name', required: true },
     { name: 'title', label: 'Title / role' },
@@ -166,11 +166,19 @@ export const profileConfig = {
     { name: 'email', label: 'Email', type: 'email' },
     { name: 'phone', label: 'Phone' },
     { name: 'birthday', label: 'Birthday', type: 'date' },
+    {
+      name: 'resume_text',
+      label: 'Resume text',
+      type: 'textarea',
+      rows: 14,
+      hint: 'Paste your resume here. Line breaks are kept, and a blank line starts a new paragraph. Anyone can read it on the site\'s resume page.',
+      wide: true,
+    },
   ],
   files: [
     { name: 'photo', label: 'Profile photo (hero)', ...IMAGE },
     { name: 'about_photo', label: 'About photo', ...IMAGE },
-    { name: 'cv', label: 'CV', kind: 'pdf', accept: 'application/pdf', hint: 'PDF. Max 10 MB.' },
+    { name: 'cv', label: 'Resume PDF', kind: 'pdf', accept: 'application/pdf', hint: 'PDF. Max 10 MB.' },
   ],
 };
 

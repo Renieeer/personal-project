@@ -160,6 +160,7 @@ export const singletonResources = {
       email: t.email(),
       phone: t.text({ max: 40 }),
       birthday: t.date(),
+      resume_text: t.text({ max: 20000 }),
     },
     files: {
       photo: image('avatars'),

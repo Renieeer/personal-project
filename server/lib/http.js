@@ -30,6 +30,8 @@ export function toHttpError(error) {
     case '22007':
     case '22008':
       return new HttpError(400, 'A value has the wrong format.');
+    case 'PGRST204':
+      return new HttpError(503, 'A database column is missing. Run supabase/migrations.sql again.');
     default: {
       const err = new HttpError(500, 'Database request failed.');
       err.cause = error;

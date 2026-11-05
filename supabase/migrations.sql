@@ -44,6 +44,9 @@ create table if not exists public.profile (
   updated_at       timestamptz not null default now()
 );
 
+-- Resume text pasted in the admin panel, shown on the /resume page.
+alter table public.profile add column if not exists resume_text text;
+
 create table if not exists public.settings (
   id               smallint primary key default 1 check (id = 1),
   site_title       text not null default '',
@@ -368,3 +371,7 @@ drop policy if exists "Public can read portfolio files" on storage.objects;
 create policy "Public can read portfolio files" on storage.objects
   for select to anon, authenticated
   using (bucket_id in ('avatars', 'projects', 'certificates', 'documents'));
+
+
+-- Lets the API see new tables and columns right away.
+notify pgrst, 'reload schema';

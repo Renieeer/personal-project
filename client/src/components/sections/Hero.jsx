@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import Reveal from '../Reveal.jsx';
 import { EditFile, EditText, useEditor } from '../../lib/edit.jsx';
 import { useText } from '../../lib/uiText.js';
@@ -18,9 +19,13 @@ export default function Hero({ data }) {
           {(profile.short_intro || editor) && (
             <Reveal as="p" className="hero-intro" delay={160}><EditText at="profile.short_intro">{profile.short_intro}</EditText></Reveal>
           )}
-          {(profile.cv_url || profile.email) && (
+          {(profile.resume_text || profile.cv_url || profile.email) && (
             <Reveal className="hero-actions" delay={240}>
-              {profile.cv_url && (
+              {profile.resume_text ? (
+                <Link className="button" to="/resume">
+                  <EditText at="ui.hero_resume">{text('hero_resume')}</EditText>
+                </Link>
+              ) : profile.cv_url && (
                 <a className="button" href={profile.cv_url} target="_blank" rel="noreferrer" download>
                   <EditText at="ui.hero_cv">{text('hero_cv')}</EditText>
                 </a>

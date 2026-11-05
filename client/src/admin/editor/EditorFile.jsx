@@ -4,7 +4,7 @@ import { fileSpec } from './schema.js';
 import Icon from './Icon.jsx';
 
 // "Replace" control for an image or file. Images get it as an overlay on the
-// picture; other files (the CV) as a small button. Removing a file is done in
+// picture; other files (the resume) as a small button. Removing a file is done in
 // the item's details panel.
 export default function EditorFile({ at }) {
   const store = useStore();

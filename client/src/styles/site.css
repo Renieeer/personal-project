@@ -969,6 +969,59 @@
   to { opacity: 1; }
 }
 
+/* Resume page ----------------------------------------------------- */
+.resume-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem 2rem;
+  margin-top: 2rem;
+}
+
+.resume-text {
+  margin-top: clamp(2.5rem, 6vw, 4.5rem);
+}
+
+/* Keeps the line breaks of the pasted text. */
+.resume-text p {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+@media print {
+  :root,
+  :root[data-theme='dark'] {
+    --bg: #ffffff;
+    --text: #000000;
+    color-scheme: light;
+  }
+
+  .site-header,
+  .site-footer,
+  .skip-link,
+  .back-link,
+  .resume-actions {
+    display: none;
+  }
+
+  .resume-page {
+    padding-block: 0;
+  }
+
+  .resume-page .project-header {
+    margin-top: 0;
+  }
+
+  .resume-page .project-page-title {
+    font-size: 2rem;
+  }
+
+  .resume-page .resume-text {
+    max-width: none;
+    margin-top: 1rem;
+  }
+}
+
 /* Status pages (404, load error) ---------------------------------- */
 .status-page {
   padding-block: clamp(5rem, 14vw, 10rem);

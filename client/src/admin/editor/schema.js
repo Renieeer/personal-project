@@ -136,12 +136,22 @@ export const UI_TEXT_GROUPS = [
   {
     title: 'Hero and about',
     items: {
-      hero_cv: 'CV button',
+      hero_cv: 'Download resume button (no resume text)',
+      hero_resume: 'View resume button',
       about_location: 'Location label',
       about_email: 'Email label',
       about_phone: 'Phone label',
       about_birthday: 'Birthday label',
       date_present: 'End of a current date range',
+    },
+  },
+  {
+    title: 'Resume page',
+    items: {
+      resume_title: 'Heading',
+      resume_back: 'Back link',
+      resume_print: 'Print button',
+      resume_download: 'PDF link',
     },
   },
   {

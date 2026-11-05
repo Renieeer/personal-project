@@ -8,7 +8,7 @@
 -- WARNING: this script clears every content table (including messages)
 -- before inserting the sample data. Do not run it on a live site.
 --
--- Images point to picsum.photos placeholders and the CV points to a
+-- Images point to picsum.photos placeholders and the resume points to a
 -- public sample PDF. Replace them by uploading files in the admin panel.
 -- =====================================================================
 

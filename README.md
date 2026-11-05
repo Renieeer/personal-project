@@ -25,7 +25,7 @@ The service role key exists only in `server/.env`. The browser never sees it.
 
 ```
 client/
-  src/pages/           Home, ProjectDetail, NotFound
+  src/pages/           Home, ProjectDetail, Resume, NotFound
   src/components/      Header, Footer, sections/*, Reveal, Skeleton, Lightbox
   src/admin/           Admin app: auth, layout, editors, pages
   src/admin/editor/    Live editor: the real site with in-place editing
@@ -73,7 +73,8 @@ In the dashboard, open **SQL Editor → New query**, then:
 **Already set up?** After updating the code, run `supabase/migrations.sql` again (it is safe to re-run and keeps your content). It adds:
 
 - the `ui_text` table that stores your button and label texts. Until then the site shows the default texts and the live editor says they can't be edited yet.
-- the private `uploads` bucket. Until then, uploading a photo, CV or favicon says the bucket is missing.
+- the private `uploads` bucket. Until then, uploading a photo, resume or favicon says the bucket is missing.
+- the `resume_text` column that stores your pasted resume. Until then, saving the Profile form says the column is missing and `/resume` shows the 404 page.
 
 Do not re-run `seed.sql`: it replaces your content with the sample content.
 
@@ -154,7 +155,7 @@ The form pages below still work, and each has an **Edit on the live page** butto
 
 - **Dashboard**: counts of projects, messages and unread messages, plus recent messages.
 - **Inbox**: read messages (opening one marks it read), mark unread, reply by email, delete.
-- **Profile & links**: name, title, intro, bio, contact details, profile photo, about photo, CV (PDF), social links.
+- **Profile & links**: name, title, intro, bio, contact details, resume text, profile photo, about photo, resume PDF, social links. Pasted resume text appears on a public `/resume` page that visitors can read and print, and the hero button links to it. With no text, the hero button downloads the PDF instead, and the PDF is otherwise linked from the resume page.
 - **Sections**: show or hide each home page section, rename its heading (also the menu label), edit its intro line and drag to reorder. A visible section with no content is not rendered.
 - **Skills, Experience, Education, Projects, Certificates, Testimonials**: create, edit and delete items, drag to reorder (or use the arrow buttons), and toggle visibility per item. Projects also have a gallery manager with captions, ordering and visibility.
 - **Settings**: site title, meta description, accent color, footer text, favicon.
@@ -173,7 +174,7 @@ Every file is checked on the server:
 | Kind | Types | Max size | Bucket |
 | --- | --- | --- | --- |
 | Images (photos, thumbnails, gallery, certificates) | JPG, PNG, WebP, GIF | 5 MB | `avatars`, `projects`, `certificates` |
-| CV | PDF | 10 MB | `documents` |
+| Resume | PDF | 10 MB | `documents` |
 | Favicon | PNG, ICO | 1 MB | `documents` |
 
 The server checks the file type, size and the file's actual bytes, and saves each file under a unique name (`<table>/<timestamp>-<uuid>.<ext>`). When a file is replaced or its record is deleted, the old file is removed from storage. Deleting a project also removes its gallery images.
@@ -222,5 +223,5 @@ On Vercel's free plan, the contact form's rate limit (kept in memory) is per fun
 
 ### After deploying
 
-- Sign in at `/admin`, then replace the sample content, upload your photos and CV, and set your accent color and favicon.
-- The seed images come from `picsum.photos` and the seed CV is a public sample PDF. Replace them by uploading your own files.
+- Sign in at `/admin`, then replace the sample content, upload your photos and resume, and set your accent color and favicon.
+- The seed images come from `picsum.photos` and the seed resume is a public sample PDF. Replace them by uploading your own files.
